@@ -1,7 +1,5 @@
 
 # coding: utf-8
-# @author: Abhishek Thakur
-# Beating the benchmark in Kaggle AFSIS Challenge.
 #import sys
 #import os
 #import pandas as pd
@@ -54,7 +52,7 @@ xtest_slope = test_slope.values
 #==============================================================================
 xtest =  np.concatenate((xtest,xtest_slope),axis=1)
 #==============================================================================
-# 
+#
 #==============================================================================
 xtest = np.concatenate((min_max_scaler.transform(xtest),feaPipeline.transform(xtest)),axis=1)
 

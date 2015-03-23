@@ -1,7 +1,5 @@
 
 # coding: utf-8
-# @author: Abhishek Thakur
-# Beating the benchmark in Kaggle AFSIS Challenge.
 import sys
 import os
 import pandas as pd
