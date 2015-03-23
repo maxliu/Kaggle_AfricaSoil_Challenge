@@ -1,0 +1,12 @@
+*.pyc
+*.pkl
+*.m
+*.pyproj
+*.txt
+*.csv
+*.pdf
+*.mat
+*.xlsx
+pickle_files/*.*
+Soil_R_code/*.*
+

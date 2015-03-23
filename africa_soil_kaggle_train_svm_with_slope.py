@@ -1,0 +1,227 @@
+
+#==============================================================================
+# useful link
+#http://scikit-learn.org/stable/modules/model_evaluation.html
+#http://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html
+#http://scikit-learn.org/stable/auto_examples/ensemble/plot_gradient_boosting_regression.html
+#==============================================================================
+import sys
+import os
+from  time import time
+import pandas as pd
+import numpy as np
+import pickle
+from operator import itemgetter
+from sklearn import svm, cross_validation
+from sklearn.cross_validation import train_test_split
+from sklearn.metrics import mean_absolute_error
+from sklearn import preprocessing
+#from sklearn.preprocessing import Imputer
+#from sklearn.preprocessing import PolynomialFeatures
+from sklearn.grid_search import (GridSearchCV, RandomizedSearchCV,
+                                 ParameterGrid, ParameterSampler)
+from sklearn.metrics import classification_report
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.feature_selection import chi2
+from sklearn.svm import LinearSVC
+
+
+#==============================================================================
+# # Utility function to report best scores
+#==============================================================================
+def report(grid_scores, n_top=3):
+    top_scores = sorted(grid_scores, key=itemgetter(1), reverse=True)[:n_top]
+    for i, score in enumerate(top_scores):
+        print("Model with rank: {0}".format(i + 1))
+        print("Mean validation score: {0:.3f} (std: {1:.3f})".format(
+              score.mean_validation_score,
+              np.std(score.cv_validation_scores)))
+        print("Parameters: {0}".format(score.parameters))
+        print("")
+def myScore(estimater,X,Y):
+    y_pred = estimater.predict(X)
+    return 1.0-mean_absolute_error(Y,y_pred)
+#==============================================================================
+#set dir
+#==============================================================================
+curDir,scriptname = os.path.split(sys.argv[0])
+os.chdir(curDir)
+
+#==============================================================================
+# Initial 
+#==============================================================================
+
+train_file = './data/training.csv'
+train_file_slope = './Soil_R_code/pSlope_train.csv'
+
+#==============================================================================
+# read data from files and pre-treatment
+#==============================================================================
+print "\nreading files\n"
+
+train = pd.read_csv(train_file)
+
+labels = train[['Ca','P','pH','SOC','Sand']].values
+
+train.drop(['Ca', 'P', 'pH', 'SOC', 'Sand', 'PIDN'], axis=1, inplace=True)
+
+train['Depth']=train['Depth'].map({'Topsoil':1,'Subsoil':0}).astype(int)
+
+xtrain = train.values
+#==============================================================================
+# read slope columns 
+#==============================================================================
+
+train_slope =pd.read_csv(train_file_slope)
+
+xtrain_slope = train_slope.values
+
+#==============================================================================
+# merge data
+#==============================================================================
+print "\nmerge data ... \n"
+xtrain =  np.concatenate((xtrain,xtrain_slope),axis=1)
+
+#==============================================================================
+# seprete data to train and validation
+#==============================================================================
+
+X_train0,X_valid0,Y_train,Y_valid = \
+train_test_split(xtrain, labels, test_size=0.1, random_state=42)
+
+#==============================================================================
+# feature engineering
+#==============================================================================
+min_max_scaler = preprocessing.MinMaxScaler()
+
+#poly = PolynomialFeatures(2,interaction_only=True,include_bias =False)
+#pca = PCA(n_components =5
+#pcapoly = PCA(n_components =2000)
+
+selection = SelectKBest(k =2000)
+
+LS = LinearSVC(C=0.01, penalty="l1", dual=False)
+
+#feaPipeline = Pipeline([
+#            ("MinMaxScaler",min_max_scaler),\
+#            ("LS",LS)
+#            ])
+
+feaPipeline = Pipeline([
+            ("MinMaxScaler",min_max_scaler),\
+            ("selection",selection)
+            ])
+#feaPipeline = Pipeline([
+#            ("MinMaxScaler",min_max_scaler),\
+#            ("pcapoly",pcapoly),\
+#            ("poly",poly)
+#            ])
+print " \n pipeline ... \n"
+#feaPipeline.fit(X_train,Y_train[:,1])
+#min_max_scaler.fit(X_train)
+
+#X_train = np.concatenate((min_max_scaler.transform(X_train),feaPipeline.transform(X_train)),axis=1)
+#X_valid = np.concatenate((min_max_scaler.transform(X_valid),feaPipeline.transform(X_valid)),axis=1)
+
+#X_train =feaPipeline.transform(X_train)
+#X_valid =feaPipeline.transform(X_valid)
+
+#==============================================================================
+# tranning and prediction
+#==============================================================================
+print "\nstart training...\n"
+
+C0 = 10000
+verbose0 = 2
+
+CList = [900,11000,5000,1000,3000]
+gammaList = [0.001,0.0,0.0,0.0,0.0]
+kernelList = ["rbf","rbf","rbf","poly","poly"]
+
+sv =[     svm.SVR(C=CList[0], gamma=gammaList[0],kernel = kernelList[0],verbose = verbose0),\
+          svm.SVR(C=CList[1], gamma=gammaList[1],kernel = kernelList[1],verbose = verbose0),\
+          svm.SVR(C=CList[2], gamma=gammaList[2],kernel = kernelList[2],verbose = verbose0),\
+          svm.SVR(C=CList[3], gamma=gammaList[3],kernel = kernelList[3],verbose = verbose0),\
+          svm.SVR(C=CList[4], gamma=gammaList[4],kernel = kernelList[4],verbose = verbose0)
+    ]
+
+fp =[feaPipeline,feaPipeline,feaPipeline,feaPipeline,feaPipeline]
+
+preds = np.zeros((X_valid0.shape[0], 5))
+
+s = np.zeros(5)
+
+
+
+#for i in range(5):
+#    sv[i].fit(X_train, Y_train[:,i])
+#    sup_vec= sv[i]
+#    preds[:,i] = sup_vec.predict(X_valid).astype(float)
+#    s[i] = mean_absolute_error(Y_valid[:,i],preds[:,i])
+#    print i,s[i]
+
+print "\n\n\n mean err ",s.mean()
+#==============================================================================
+# grid searching
+#==============================================================================
+# "poly","sigmoid"
+
+param_grid ={"kernel":["rbf"],
+"gamma":[0.0],
+"C":[1000]}
+#"C":[1000,2000,5000,10000]}
+s = np.zeros(5)
+print "start grid searching ......"
+for i in range(5):
+
+    feaPipeline.fit(X_train0,Y_train[:,i])
+    
+    X_train =feaPipeline.transform(X_train0)
+    X_valid =feaPipeline.transform(X_valid0)
+    
+    sup_vec = svm.SVR(C=500, verbose = 2)
+    
+    sup_vec.fit(X_train, Y_train[:,i])
+    
+#    print("GridSearchCV took %.2f seconds for %d candidate parameter settings."
+#          % (time() - start, len(grid_search.grid_scores_)))
+    print "\n\n i = ",i
+    print "\n\n"
+#    report(grid_search.grid_scores_)
+    fp[i] = feaPipeline
+    sv[i] = sup_vec
+    
+    y_true,y_pred = Y_valid[:,i],sv[i].predict(X_valid).astype(float)
+    
+    print "mean err: ",i,mean_absolute_error(y_true,y_pred)
+    s[i] = mean_absolute_error(y_true,y_pred)
+    
+print "\ndone s = ",s.mean()
+#==============================================================================
+# save results
+#==============================================================================
+#outFile1 = open('./pickle_files/est1.pkl','wb')
+#outFile2 = open('./pickle_files/est2.pkl','wb')
+#outFile3 = open('./pickle_files/est3.pkl','wb')
+#pickle.dump(feaPipeline,outFile1)
+#pickle.dump(sv,outFile2)
+#pickle.dump(min_max_scaler,outFile3)
+#outFile1.close
+#outFile2.close
+#outFile3.close
+#
+#outFile1 = open('./pickle_files/est1.pkl','U')
+#outFile2 = open('./pickle_files/est2.pkl','U')
+#outFile3 = open('./pickle_files/est3.pkl','U')
+#feaPipeline = pickle.load(outFile1)
+#sv = pickle.load(outFile2)
+#min_max_scaler = pickle.load(outFile3)
+#
+#outFile1.close()
+#outFile2.close()
+#outFile3.close()
+
+
+
